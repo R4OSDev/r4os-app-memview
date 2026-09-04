@@ -150,8 +150,8 @@ const App = struct {
     }
 
     fn updateMetrics(self: *App, info: r4os.abi.GuiWindowInfo) void {
-        self.w = clampI32(info.client_w, 420, 1600);
-        self.h = clampI32(info.client_h, 280, 1000);
+        self.w = @max(info.client_w, 420);
+        self.h = @max(info.client_h, 280);
     }
 
     fn runSelfTest(self: *App) i32 {
@@ -626,10 +626,4 @@ fn equalsIgnoreCase(a: []const u8, b: []const u8) bool {
 fn asciiLower(ch: u8) u8 {
     if (ch >= 'A' and ch <= 'Z') return ch + 32;
     return ch;
-}
-
-fn clampI32(value: i32, min_value: i32, max_value: i32) i32 {
-    if (value < min_value) return min_value;
-    if (value > max_value) return max_value;
-    return value;
 }
