@@ -120,31 +120,38 @@ const App = struct {
         self.updateMetrics(info);
         self.render();
 
-        var frame: u32 = 0;
+        var timers: [1]r4os.Timer = .{.{}};
+        if (!timers[0].start(&self.ctx.sys, .{ .value = 1 }, .{ .nanoseconds = 1_000_000_000 }, true)) return -1;
+        var events = r4os.EventLoop.init(self.ctx.sys, self.ctx.desk, &timers);
         while (!self.ctx.sys.programShouldClose()) {
             var dirty = false;
-            var event: r4os.abi.GuiEvent = .{};
-            while (self.ctx.desk.guiPollEvent(&event) > 0) {
-                const kind: r4os.abi.GuiEventKind = @enumFromInt(event.kind);
-                switch (kind) {
-                    .close => return 0,
-                    .resize => {
-                        _ = self.ctx.desk.guiWindowInfo(&info);
-                        self.updateMetrics(info);
-                        dirty = true;
-                    },
-                    .key_down => {
-                        const key: u8 = @intCast(event.key & 0xFF);
-                        if (key == r4os.gui.Key.escape) return 0;
-                        if (key == 'r' or key == 'R') dirty = true;
-                    },
-                    else => {},
-                }
+            switch (events.wait(r4os.time_contract.timeoutForever())) {
+                .message => |message| {
+                    if (message == .timer) {
+                        self.render();
+                        continue;
+                    }
+                    const event = message.guiEvent() orelse continue;
+                    const kind: r4os.abi.GuiEventKind = @enumFromInt(event.kind);
+                    switch (kind) {
+                        .close => return 0,
+                        .resize => {
+                            _ = self.ctx.desk.guiWindowInfo(&info);
+                            self.updateMetrics(info);
+                            dirty = true;
+                        },
+                        .key_down => {
+                            const key: u8 = @intCast(event.key & 0xFF);
+                            if (key == r4os.gui.Key.escape) return 0;
+                            if (key == 'r' or key == 'R') dirty = true;
+                        },
+                        else => {},
+                    }
+                },
+                .failure => |raw| return raw,
+                .timed_out => {},
             }
-            if (dirty or frame == 0) self.render();
-            frame +%= 1;
-            if (frame >= 35) frame = 0;
-            self.ctx.sys.sleepTicks(3);
+            if (dirty) self.render();
         }
         return 0;
     }
